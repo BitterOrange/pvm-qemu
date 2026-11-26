@@ -308,7 +308,10 @@ def main():
 
     def help_of(opt):
         if opt not in helps:
-            rc, out = run([system, opt, "help"])
+            # qemu-system-aarch64 has no default machine, and some listings
+            # refuse to run without one; the empty machine works everywhere.
+            machine = [] if opt == "-machine" else ["-machine", "none"]
+            rc, out = run([system] + machine + [opt, "help"])
             helps[opt] = out if rc == 0 else f"(exit {rc})\n{out}"
         return helps[opt]
 
