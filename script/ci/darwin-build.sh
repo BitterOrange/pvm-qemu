@@ -13,7 +13,7 @@ out=${3:?}
 load_release "$tag"
 export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
 
-brew install --quiet gnupg ninja pkgconf glib pixman libslirp dtc
+brew install --quiet gnupg ninja pkgconf glib pixman libslirp dtc python-setuptools
 brew list --versions | sort > "$out/build-packages.txt"
 
 src=$("$PVMQ_ROOT/script/prepare-source.sh" "$tag" "$upstream" "$out/src")

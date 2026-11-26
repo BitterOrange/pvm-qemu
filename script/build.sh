@@ -23,7 +23,6 @@ case "$prefix" in /*) ;; *) prefix="$PWD/$prefix" ;; esac
 common=(
   --prefix="$prefix"
   --enable-tools
-  --disable-download
   --enable-slirp
   --disable-user
   --disable-docs
@@ -74,6 +73,14 @@ esac
 args=("${common[@]}" "${extra[@]}")
 printf '%s\n' "${args[@]}" | sed "s|^--prefix=.*|--prefix=<prefix>|" > "$prefix.configure"
 
+# Everything compiled must come from the verified tarball, which is what the
+# source asset publishes. meson may fetch a missing subproject on its own,
+# so fail if configure or the build adds anything under subprojects/.
+# (--disable-download would also stop QEMU's build venv from installing the
+# Python build tools it lacks, which Homebrew cannot supply.)
+subprojects() { find "$src/subprojects" -mindepth 1 -maxdepth 2 | LC_ALL=C sort; }
+before=$(subprojects)
+
 build="$src/build-pvm"
 mkdir -p "$build"
 cd "$build"
@@ -81,4 +88,8 @@ cd "$build"
 jobs=$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu)
 make -j"$jobs"
 make install
+
+added=$(comm -13 <(echo "$before") <(subprojects))
+[ -z "$added" ] || die "the build fetched sources that are not in the QEMU tarball:
+$added"
 echo "installed QEMU for $host into $prefix"
