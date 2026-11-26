@@ -98,7 +98,7 @@ script/validate.sh restore
 - `/share` and `pvm mount` (macOS, Linux);
 - a port map;
 - an exit route with a tunnel-loss check, with `--exit`;
-- a RAM snapshot and its restore;
+- a RAM snapshot and its restore (not on Windows: QEMU blocks migration of WHPX VMs, so pvm has no RAM snapshots there);
 - compact;
 - removal of the VM.
 

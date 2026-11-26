@@ -13,7 +13,8 @@
 #       Runs the cycle on a new VM (default pvmqemu-check, ubuntu:26.04):
 #       create with bake, start and readiness, ssh, the /share and pvm mount
 #       9p paths (macOS, Linux), a port map, an exit route with a tunnel-loss
-#       check (with --exit, interactive), a RAM snapshot and its restore,
+#       check (with --exit, interactive), a RAM snapshot and its restore (not
+#       on Windows, where QEMU cannot migrate WHPX VMs),
 #       compact, and removal (unless --keep). Logs to validate-<host>-<time>.log.
 #       --mem and --cpus size the VM (pvm's defaults otherwise). --allow-tcg
 #       skips the hardware accelerator check, for machines without one, such
@@ -151,7 +152,26 @@ cmd_run() {
   in_vm() { pvm ssh "$vm" "$@"; }
   pvm ls 2>/dev/null | awk 'NR > 1 {print $1}' | grep -qx "$vm" && die "VM $vm already exists; choose another with --vm"
 
-  hw_accel() { pvm daemon status | tee /dev/stderr | grep -i accel | grep -viq tcg; }
+  hw_accel() {
+    local line; line=$(pvm daemon status | grep -i 'accel:')
+    echo "$line"
+    [ -n "$line" ] && ! echo "$line" | grep -qi tcg
+  }
+  vm_status() { pvm ls 2>/dev/null | awk -v vm="$vm" '$1 == vm {print $5}'; }
+  # A snapshot counts only when the VM stopped and snapshot ls lists it
+  # unconsumed; a failed snapshot leaves the VM running with its memory
+  # intact, which would make the restore checks pass by themselves.
+  snapshot_saved() {
+    pvm snapshot create "$vm" || return 1
+    [ "$(vm_status)" = stopped ] || { echo "the VM is $(vm_status), not stopped"; return 1; }
+    pvm snapshot ls "$vm" | awk -v vm="$vm" '$1 == vm && $NF == "false" {ok = 1} END {exit !ok}' ||
+      { pvm snapshot ls "$vm"; echo "snapshot ls does not list an unconsumed snapshot of $vm"; return 1; }
+  }
+  snapshot_restored() {
+    pvm start "$vm" || return 1
+    pvm snapshot ls "$vm" | awk -v vm="$vm" '$1 == vm && $NF == "true" {ok = 1} END {exit !ok}' ||
+      { pvm snapshot ls "$vm"; echo "the start did not consume the snapshot"; return 1; }
+  }
   from_slot() { [ -n "$(qemu_from_slot)" ]; }
   share_works() { in_vm "echo $1 > /share/pvmq-test" && grep -qx "$1" "$pvm_home/vms/$vm/share/pvmq-test"; }
   mount_works() { pvm mount "$vm" "$2:/home/dev/pvmq" && in_vm 'cat /home/dev/pvmq/from-host' | grep -qx "$1"; }
@@ -196,12 +216,21 @@ cmd_run() {
       echo "skipped the tunnel-loss check: not a terminal"
     fi
   fi
-  local ram
-  ram="pvmq-ram-$RANDOM$RANDOM"
-  in_vm "echo $ram > /dev/shm/pvmq-mark" || true
-  step "snapshot create" pvm snapshot create "$vm" || true
-  step "start restores the snapshot" pvm start "$vm" || true
-  step "RAM content survived the snapshot" ram_kept "$ram" || true
+  if [ "$host" = windows-amd64 ]; then
+    # QEMU's WHPX backend registers a migration blocker for every VM
+    # ("missing dirty memory tracking support"), in every release so far.
+    echo "skipped RAM snapshots: QEMU cannot migrate WHPX VMs, so pvm has no RAM snapshots on native Windows"
+  else
+    local ram
+    ram="pvmq-ram-$RANDOM$RANDOM"
+    in_vm "echo $ram > /dev/shm/pvmq-mark" || true
+    if step "snapshot create stops the VM and saves a snapshot" snapshot_saved; then
+      step "start restores the snapshot" snapshot_restored || true
+      step "RAM content survived the snapshot" ram_kept "$ram" || true
+    else
+      echo "skipped the restore checks: no snapshot was saved"
+    fi
+  fi
   step "stop" pvm stop "$vm" || true
   step "compact" pvm compact "$vm" || true
   step "start after compact" pvm start "$vm" || true
