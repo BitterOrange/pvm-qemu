@@ -6,6 +6,10 @@ PVMQ_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
 die() { echo "error: $*" >&2; exit 1; }
 
+# The scripts use associative arrays and other bash 4 features; on macOS
+# install bash from Homebrew (validate.sh alone also runs with bash 3.2).
+[ "${BASH_VERSINFO[0]}" -ge 4 ] || die "bash 4 or later is required (this is bash $BASH_VERSION)"
+
 sha256_of() {
   if command -v sha256sum >/dev/null 2>&1; then
     sha256sum "$1" | awk '{print $1}'

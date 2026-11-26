@@ -106,6 +106,8 @@ jobs:
         with:
           name: upstream
           path: upstream
+      - name: Bash 4 or later for the scripts (macOS ships 3.2)
+        run: HOMEBREW_NO_AUTO_UPDATE=1 brew install --quiet bash && bash --version | head -1
       - name: Build, pack and sign
         run: mkdir out && script/ci/darwin-build.sh "$TAG" upstream out
       - name: An unsigned copy must fail the closure check
