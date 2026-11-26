@@ -157,7 +157,7 @@ cmd_run() {
     echo "$line"
     [ -n "$line" ] && ! echo "$line" | grep -qi tcg
   }
-  vm_status() { pvm ls 2>/dev/null | awk -v vm="$vm" '$1 == vm {print $5}'; }
+  vm_status() { pvm ls 2>/dev/null | awk -v vm="$vm" '$1 == vm {print $4}'; }
   # A snapshot counts only when the VM stopped and snapshot ls lists it
   # unconsumed; a failed snapshot leaves the VM running with its memory
   # intact, which would make the restore checks pass by themselves.
