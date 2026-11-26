@@ -59,6 +59,11 @@ for f in "$dest"/bin/* "$dest"/lib/*.dylib; do
   case "$f" in
     *.dylib) install_name_tool -id "@executable_path/../lib/$(basename "$f")" "$f" ;;
   esac
+  # Every reference now names its file under @executable_path, so search
+  # paths (some Homebrew dylibs carry one) could only reach outside the tree.
+  while read -r rp; do
+    install_name_tool -delete_rpath "$rp" "$f"
+  done < <(otool -l "$f" | awk '$1 == "cmd" && $2 == "LC_RPATH" {r = 1; next} r && $1 == "path" {print $2; r = 0}')
 done
 
 # The rewrites invalidate every signature. Sign the libraries and qemu-img
