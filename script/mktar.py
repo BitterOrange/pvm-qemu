@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Write a reproducible tar archive of one directory.
 
     mktar.py --root PARENT --entry NAME --out FILE [--gzip] [--epoch N]

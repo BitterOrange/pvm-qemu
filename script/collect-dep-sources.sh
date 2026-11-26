@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # collect-dep-sources.sh <host> <tree> <out-dir>
 #
 # For every library a packer copied into <tree> (listed in <tree>.origins),

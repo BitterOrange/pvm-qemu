@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # validate-pvm.sh
 #
 # Installs the pvm release PVM_TAG (e.g. v1.3.6) with that release's own

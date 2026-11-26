@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # pack-darwin.sh <prefix> <dest>
 #
 # Turns a QEMU installed under <prefix> into a relocatable tree at <dest>
@@ -35,7 +36,7 @@ queue=("$dest"/bin/*)
 while [ ${#queue[@]} -gt 0 ]; do
   cur=${queue[0]}
   queue=("${queue[@]:1}")
-  for dep in $(nonsystem "$cur"); do
+  while IFS= read -r dep; do
     case "$dep" in
       /opt/homebrew/*) ;;
       *) die "$(basename "$cur") loads $dep, which is neither a system library nor from Homebrew" ;;
@@ -45,17 +46,16 @@ while [ ${#queue[@]} -gt 0 ]; do
     [ -f "$dest/lib/$name" ] && continue
     cp "$dep" "$dest/lib/$name"
     chmod 0644 "$dest/lib/$name"
-    chmod u+w "$dest/lib/$name"
-    printf '%s\t%s\n' "lib/$name" "$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$dep")" >> "$origins"
+    printf '%s\t%s\n' "lib/$name" "$(readlink -f "$dep")" >> "$origins"
     queue+=("$dest/lib/$name")
-  done
+  done < <(nonsystem "$cur")
 done
 
 for f in "$dest"/bin/* "$dest"/lib/*.dylib; do
   [ -f "$f" ] || continue
-  for dep in $(nonsystem "$f"); do
+  while IFS= read -r dep; do
     install_name_tool -change "$dep" "@executable_path/../lib/$(basename "$dep")" "$f"
-  done
+  done < <(nonsystem "$f")
   case "$f" in
     *.dylib) install_name_tool -id "@executable_path/../lib/$(basename "$f")" "$f" ;;
   esac

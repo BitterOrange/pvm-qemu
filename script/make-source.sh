@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # make-source.sh <tag> <upstream-dir> <out-dir>
 #
 # Writes <out-dir>/pvm-qemu-<tag>-source.tar.gz, the corresponding source of

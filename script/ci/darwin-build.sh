@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # darwin-build.sh <tag> <upstream-dir> <out-dir>
 #
 # Runs on a GitHub-hosted macos-15 runner: installs the build dependencies

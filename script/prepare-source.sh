@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # prepare-source.sh <tag> <upstream-dir> <work-dir>
 #
 # Extracts the verified tarball into <work-dir>/qemu-<version> and applies

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # validate-fetch.sh <host> <dir>
 #
 # Downloads the <host> archive of a ci run into <dir>: the run in

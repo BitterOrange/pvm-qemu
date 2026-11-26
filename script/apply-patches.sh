@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # apply-patches.sh <patch-dir> <source-dir> [patch...]
 #
 # Applies each patch in order with no fuzz. Every patch must name the

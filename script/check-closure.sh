@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # check-closure.sh <host> <tree>
 #
 # Fails if any shipped executable or library loads something that is

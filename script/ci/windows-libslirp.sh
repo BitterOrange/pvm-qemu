@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # windows-libslirp.sh <prefix>
 #
 # Fedora has no mingw build of libslirp, which QEMU needs for user

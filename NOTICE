@@ -14,5 +14,8 @@ license texts in doc/licenses/. The complete corresponding source of every
 release is published as assets of the same release; see doc/SOURCE.txt in
 each archive.
 
-The packaging scripts in script/ derive from the QEMU runtime scripts of
-pvm (https://github.com/BitterOrange/pvm, script/qemu/).
+The scripts and workflows of this repository are licensed under the GNU
+General Public License, version 2 or (at your option) any later version
+(SPDX: GPL-2.0-or-later); see LICENSE. script/pack-darwin.sh and
+script/pack-linux.sh derive from the QEMU runtime scripts of pvm
+(https://github.com/BitterOrange/pvm, script/qemu/).

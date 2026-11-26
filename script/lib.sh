@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 # shellcheck shell=bash
 # Shared helpers, sourced by the other scripts.
 
