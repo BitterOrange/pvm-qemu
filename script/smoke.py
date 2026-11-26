@@ -304,28 +304,36 @@ def main():
     rc, out = run([img, "--version"])
     check(rc == 0 and "qemu-img version" in out, "qemu-img --version runs")
 
-    def help_of(opt):
-        rc, out = run([system, opt, "help"])
-        return out if rc == 0 else ""
+    helps = {}
 
-    accels = {w.strip() for w in help_of("-accel").splitlines()[1:]}
+    def help_of(opt):
+        if opt not in helps:
+            rc, out = run([system, opt, "help"])
+            helps[opt] = out if rc == 0 else f"(exit {rc})\n{out}"
+        return helps[opt]
+
+    def lists(opt, name, names):
+        """Check a name in a help listing; print the listing if it is missing."""
+        if not check(name in names, f"{opt} help lists {name}"):
+            print(f"--- {opt} help ---\n{help_of(opt)}--- end ---")
+
+    # Listings are one name per line after a header; match whole words so
+    # indentation or extra columns do not matter.
+    words = lambda opt: set(re.findall(r"[A-Za-z0-9_.-]+", help_of(opt)))
     for acc in m["declares"]["accels"]:
-        check(acc in accels, f"-accel help lists {acc}")
+        lists("-accel", acc, words("-accel"))
     machines = {l.split()[0] for l in help_of("-machine").splitlines()[1:] if l.strip()}
-    check(("virt" if m["target"].startswith("aarch64") else "q35") in machines, "-machine help lists pvm's machine")
-    netdevs = {w.strip() for w in help_of("-netdev").splitlines()[1:]}
+    lists("-machine", "virt" if m["target"].startswith("aarch64") else "q35", machines)
     for nd in ("user", "stream"):
-        check(nd in netdevs, f"-netdev help lists {nd}")
+        lists("-netdev", nd, words("-netdev"))
     devices = set(re.findall(r'^name "([^"]+)"', help_of("-device"), re.M))
     for dev in ("virtio-net-pci", "virtio-rng-pci", "virtio-serial-pci", "virtserialport",
                 "virtio-balloon-pci", "virtio-gpu-pci", "pcie-root-port", "virtio-blk-pci"):
-        check(dev in devices, f"-device help lists {dev}")
+        lists("-device", dev, devices)
     has9p = "virtio-9p-pci-non-transitional" in devices
     check(has9p == m["declares"]["virtio_9p"],
           f"virtio-9p is {'present' if has9p else 'absent'}, as the manifest declares")
-    objects = {w.strip() for w in help_of("-object").splitlines()[1:]}
-    rng = "rng-builtin" if WINDOWS else "rng-random"
-    check(rng in objects, f"-object help lists {rng}")
+    lists("-object", "rng-builtin" if WINDOWS else "rng-random", words("-object"))
     check(os.path.isfile(os.path.join(tree, m["firmware_dir"], "bios-256k.bin" if m["target"].startswith("x86") else "edk2-aarch64-code.fd")),
           "the firmware is in firmware_dir")
 
