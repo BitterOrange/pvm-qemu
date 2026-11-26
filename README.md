@@ -61,6 +61,16 @@ x86_64/
 
 This is the runtime layout pvm v1.1 to v1.3 already accept. So the same archive can be tried under an existing pvm, and v1.4.x and v1.5.x releases can carry it under the old `pvm-qemu-runtime-*` names for clients that still upgrade the old way.
 
+## Known limitations
+
+These come from QEMU or the host, not from how the builds are made. The weilnetz Windows build that pvm v1.3.x ships behaves the same way.
+
+- **macOS 15 or later on Apple silicon.** The dependencies are Homebrew's macOS 15 bottles, so the binaries carry `minos 15.0`; the archive's `pvm-qemu.json` records it.
+- **No RAM snapshots under WHPX.** QEMU's WHPX backend adds a migration blocker to every VM ("missing dirty memory tracking support"), in every release so far, so migration and pvm's RAM snapshots fail on native Windows. HVF, KVM and TCG are not affected.
+- **No AVX in WHPX guests yet.** pvm boots WHPX guests with `noxsave` (see pvm's roadmap), but CPUID still lists AVX and AVX2, so programs that check only CPUID and then use AVX die with SIGILL. The XSAVE fixes in QEMU 11.2 are meant to lift this.
+- **No virtio-9p on Windows.** QEMU supports VirtFS only on Linux, macOS and FreeBSD hosts, so the Windows build has none and its manifest declares so.
+- **Balloon messages on Windows.** With free-page reporting on, QEMU logs `ram_block_discard_shared_range: MADVISE not available` for every page range the guest reports, because Windows has no matching call; the memory is not returned to the host.
+
 ## Verifying a download
 
 ```
