@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # build.sh <host> <source-dir> <prefix>
 #
 # Configures, builds and installs QEMU for one host:

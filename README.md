@@ -146,3 +146,7 @@ These are made by the maintainer in the GitHub settings, not by code:
 - **Releases and security:**
   - immutable releases are on;
   - private vulnerability reporting is on.
+
+## License
+
+The scripts and workflows in this repository are licensed under GPL-2.0-or-later; see [LICENSE](LICENSE). QEMU and the bundled libraries keep their own licenses, listed in each archive's `doc/` and described under [Source](#source).

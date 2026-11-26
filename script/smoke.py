@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Check that a finished tree runs what pvm runs.
 
     smoke.py TREE [--accel tcg|hvf|kvm|whpx] [--skip-sums]

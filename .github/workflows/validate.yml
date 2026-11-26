@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Runs script/validate.sh on GitHub-hosted runners: a CI build of this
 # repository under an unchanged pvm release, through a whole VM cycle.
 # Manual only. Linux runs under KVM, so it stands in for a real KVM host.

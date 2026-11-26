@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Checks and full builds for pushes and pull requests. Nothing is
 # published: the archives are kept as workflow artifacts for a few days,
 # for testing before a tag (script/validate.sh install --no-attest).

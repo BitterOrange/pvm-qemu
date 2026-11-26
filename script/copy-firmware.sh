@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # copy-firmware.sh <x86_64|aarch64> <qemu-data-dir> <dest>
 #
 # Copies the firmware and option ROMs a headless pvm VM of that target can

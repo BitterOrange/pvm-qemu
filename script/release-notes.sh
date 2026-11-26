@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # release-notes.sh <tag>
 #
 # Prints the release notes: what the build is, its patches, how to verify

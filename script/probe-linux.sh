@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # probe-linux.sh <x86_64-tree> [hidden-dir...]
 #
 # Proves a Linux build is relocatable: copies the tree to another path and

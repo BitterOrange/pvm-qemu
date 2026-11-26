@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Builds every host for one release file. Called by ci.yml (no publishing)
 # and release.yml (publishes); never runs on its own.
 name: build

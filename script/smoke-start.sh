@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
 # smoke-start.sh <x86_64-tree>
 #
 # A minimal start test for a Linux build that needs nothing but sh: QEMU

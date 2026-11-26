@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 # The only workflow that publishes. It runs on a protected tag
 # <qemu-version>-pvm<N>, builds every host, and publishes a release after
 # the maintainer approves the "release" environment: a draft first, with

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # pack-windows.sh <prefix> <dest>
 #
 # Turns a mingw-w64 QEMU installed under <prefix> into the tree at <dest>

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # validate.sh - run a pvm-qemu build under an unchanged pvm v1.3.x on a real
 # HVF, KVM or WHPX host. On Windows, run it from Git Bash.
 #
@@ -250,5 +251,5 @@ case "${1:-}" in
   run) shift; cmd_run "$@" ;;
   restore) shift; cmd_restore ;;
   status) shift; cmd_status ;;
-  *) sed -n '2,/^set -euo/p' "$0" | sed '$d; s/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '3,/^set -euo/p' "$0" | sed '$d; s/^# \{0,1\}//'; exit 2 ;;
 esac

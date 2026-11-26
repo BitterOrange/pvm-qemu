@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
 # test-verify.sh <tag> <upstream-dir>
 #
 # Proves that the source checks fail when they should. Needs the verified
