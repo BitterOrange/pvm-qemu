@@ -58,7 +58,10 @@ common=(
 )
 case "$host" in
   darwin-arm64)
-    extra=(--target-list=aarch64-softmmu --enable-hvf --enable-virtfs --disable-cocoa --disable-pvg)
+    # libfdt is found with a plain compiler check, and Apple's compiler
+    # does not search Homebrew's prefix on its own.
+    extra=(--target-list=aarch64-softmmu --enable-hvf --enable-virtfs --disable-cocoa --disable-pvg
+           --extra-cflags=-I/opt/homebrew/include --extra-ldflags=-L/opt/homebrew/lib)
     ;;
   linux-amd64)
     extra=(--target-list=x86_64-softmmu --enable-kvm --enable-virtfs --enable-attr --enable-cap-ng

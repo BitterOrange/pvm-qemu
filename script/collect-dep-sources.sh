@@ -34,8 +34,12 @@ declare -A done_pkg=()
 
 linux_owner() {
   local real=$1 orig=$2 p
+  # dpkg -S prints "pkg[:arch][, pkg...]: path" lines, and for a diverted
+  # file such as the ELF loader also "diversion by pkg from: path" lines.
+  local owner
   for p in "$orig" "$real" "${orig#/usr}" "${real#/usr}" "/usr$orig"; do
-    dpkg -S "$p" 2>/dev/null | head -1 | cut -d: -f1 && return 0
+    owner=$(dpkg -S "$p" 2>/dev/null | grep -v '^diversion ' | head -1 | sed -E 's/[:,].*//') || true
+    [ -n "$owner" ] && { echo "$owner"; return 0; }
   done
   return 1
 }
