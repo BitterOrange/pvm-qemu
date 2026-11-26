@@ -16,12 +16,14 @@ load_release "$tag"
 # The upstream image has what QEMU's own CI builds with; add what this
 # build needs on top and fail if any of it is unavailable.
 dnf install -y -q --setopt=install_weak_deps=False \
-  mingw64-glib2 mingw64-pixman mingw64-zlib \
+  mingw64-glib2 mingw64-pixman mingw64-zlib mingw64-libfdt \
   patch gnupg2 python3 findutils file cpio
 rpm -qa --qf '%{NAME}\t%{VERSION}-%{RELEASE}\n' | sort > "$out/build-packages.txt"
 
 # libslirp has no mingw package in Fedora; build it from Fedora's source RPM.
-slirp=/opt/pvm-deps/libslirp
+# It goes under the mingw sysroot, because the mingw pkg-config prefixes
+# the sysroot to every path that does not already start with it.
+slirp=/usr/x86_64-w64-mingw32/sys-root/mingw/opt/pvm-deps/libslirp
 "$PVMQ_ROOT/script/ci/windows-libslirp.sh" "$slirp"
 printf 'libslirp (built)\t%s\n' "$(cut -f2 "$slirp/pvm-source/PACKAGE")" >> "$out/build-packages.txt"
 export PKG_CONFIG_PATH="$slirp/lib/pkgconfig"

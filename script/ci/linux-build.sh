@@ -19,7 +19,7 @@ apt-get update -q
 apt-get install -y -q --no-install-recommends \
   build-essential pkg-config ninja-build python3 python3-venv bzip2 xz-utils flex bison \
   patch patchelf file ca-certificates gpg gpgv dpkg-dev \
-  libglib2.0-dev libpixman-1-dev libslirp-dev libcap-ng-dev libattr1-dev zlib1g-dev
+  libglib2.0-dev libpixman-1-dev libslirp-dev libcap-ng-dev libattr1-dev libfdt-dev zlib1g-dev
 dpkg-query -W -f '${Package}\t${Version}\n' | sort > "$out/build-packages.txt"
 
 src=$("$PVMQ_ROOT/script/prepare-source.sh" "$tag" "$upstream" "$out/src")

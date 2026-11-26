@@ -13,11 +13,11 @@ out=${3:?}
 load_release "$tag"
 export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
 
-brew install --quiet gnupg ninja pkgconf glib pixman libslirp
+brew install --quiet gnupg ninja pkgconf glib pixman libslirp dtc
 brew list --versions | sort > "$out/build-packages.txt"
 
 src=$("$PVMQ_ROOT/script/prepare-source.sh" "$tag" "$upstream" "$out/src")
-prefix="$out/prefix"
+prefix="$(cd "$out" && pwd)/prefix"
 "$PVMQ_ROOT/script/build.sh" darwin-arm64 "$src" "$prefix"
 tree="$out/tree/aarch64"
 "$PVMQ_ROOT/script/pack-darwin.sh" "$prefix" "$tree"

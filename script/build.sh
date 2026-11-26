@@ -18,10 +18,12 @@ set -euo pipefail
 host=${1:?usage: build.sh <host> <source-dir> <prefix>}
 src=$(cd "${2:?}" && pwd)
 prefix=${3:?}
+case "$prefix" in /*) ;; *) prefix="$PWD/$prefix" ;; esac
 
 common=(
   --prefix="$prefix"
   --enable-tools
+  --disable-download
   --enable-slirp
   --disable-user
   --disable-docs
