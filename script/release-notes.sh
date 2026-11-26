@@ -43,5 +43,5 @@ gh attestation verify <asset> --repo $repo --signer-workflow $repo/.github/workf
 sha256sum -c SHA256SUMS --ignore-missing
 \`\`\`
 
-Source: \`$(source_asset "$tag")\` holds the upstream tarball, its signature, the patches and this repository at the tag; each \`*-deps-source.tar\` holds the source of the libraries shipped in that host's archive, which its \`doc/THIRD-PARTY.txt\` lists.
+Source: \`$(source_asset "$tag")\` holds the upstream tarball, its signature, the patches and this repository at the tag; each \`*-deps-source.tar\` holds the source of the libraries shipped in that host's archive, which its \`doc/THIRD-PARTY.txt\` lists. The "Source code" archives that GitHub adds to every release hold only this repository's scripts, not QEMU.
 EOF
