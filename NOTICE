@@ -1,0 +1,18 @@
+pvm-qemu
+
+The binaries published by this project are builds of QEMU, made from the
+unmodified upstream source releases published at https://download.qemu.org/,
+with only the upstream patches listed in each release. They are not official
+QEMU releases. This project is not affiliated with, endorsed by or supported
+by the QEMU project. QEMU is a trademark of Fabrice Bellard.
+
+QEMU is licensed under the GNU General Public License, version 2. Parts of it
+are under other licenses, listed in its LICENSE file. Each archive carries
+QEMU's COPYING, COPYING.LIB and LICENSE in doc/, and lists every bundled
+library with its package and license in doc/THIRD-PARTY.txt, with the
+license texts in doc/licenses/. The complete corresponding source of every
+release is published as assets of the same release; see doc/SOURCE.txt in
+each archive.
+
+The packaging scripts in script/ derive from the QEMU runtime scripts of
+pvm (https://github.com/BitterOrange/pvm, script/qemu/).

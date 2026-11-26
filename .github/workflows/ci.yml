@@ -1,0 +1,58 @@
+# Checks and full builds for pushes and pull requests. Nothing is
+# published: the archives are kept as workflow artifacts for a few days,
+# for testing before a tag (script/validate.sh install --no-attest).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: release file to build (default the newest in releases/)
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Shell and Python syntax
+        run: |
+          for f in script/*.sh script/ci/*.sh; do bash -n "$f"; done
+          shellcheck -S warning script/*.sh script/ci/*.sh
+          python3 -m py_compile script/*.py
+      - name: Every release file parses
+        run: |
+          for f in releases/*.env; do
+            t=$(basename "$f" .env)
+            bash -c '. script/lib.sh && load_release "$0"' "$t"
+          done
+      - name: Pick the release file to build
+        id: tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          tag=${INPUT_TAG:-$(find releases -name '*.env' -printf '%f\n' | sed 's/\.env$//' | sort -V | tail -1)}
+          bash -c '. script/lib.sh && load_release "$0"' "$tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: lint
+    uses: ./.github/workflows/build.yml
+    with:
+      tag: ${{ needs.lint.outputs.tag }}

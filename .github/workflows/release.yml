@@ -1,0 +1,87 @@
+# The only workflow that publishes. It runs on a protected tag
+# <qemu-version>-pvm<N>, builds every host, and publishes a release after
+# the maintainer approves the "release" environment: a draft first, with
+# SHA256SUMS and build-provenance attestations for every asset, then
+# published. pvm verifies these attestations against this file
+# (--signer-workflow BitterOrange/pvm-qemu/.github/workflows/release.yml).
+name: release
+
+on:
+  push:
+    tags: ['*-pvm*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: The tag names an existing release file
+        env:
+          TAG: ${{ github.ref_name }}
+        run: bash -c '. script/lib.sh && load_release "$TAG"'
+
+  build:
+    needs: check
+    uses: ./.github/workflows/build.yml
+    with:
+      tag: ${{ github.ref_name }}
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          path: release
+          pattern: release-*
+          merge-multiple: true
+      - name: Check the asset set and write SHA256SUMS
+        run: |
+          . script/lib.sh
+          want=("$(source_asset "$TAG")")
+          for h in darwin-arm64 linux-amd64 windows-amd64; do
+            want+=("$(host_asset "$TAG" "$h")" "$(deps_asset "$TAG" "$h")")
+          done
+          cd release
+          have=$(find . -maxdepth 1 -type f -printf '%f\n' | sort)
+          [ "$have" = "$(printf '%s\n' "${want[@]}" | sort)" ] || { printf 'unexpected asset set:\n%s\n' "$have" >&2; exit 1; }
+          sha256sum -- * > SHA256SUMS
+          cat SHA256SUMS
+      - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: release/*
+      - name: Release notes
+        run: script/release-notes.sh "$TAG" > notes.md
+      - name: Publish draft-first
+        run: |
+          . script/lib.sh && load_release "$TAG"
+          build=${TAG##*-pvm}
+          pre=()
+          case "$TAG" in *-rc*) pre=(--prerelease) ;; esac
+          gh release create "$TAG" --verify-tag --draft "${pre[@]}" \
+            --title "QEMU $QEMU_VERSION for pvm, build $build (unofficial)" \
+            --notes-file notes.md release/*
+          gh release edit "$TAG" --draft=false

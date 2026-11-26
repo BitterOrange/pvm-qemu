@@ -1,0 +1,9 @@
+# build and test output
+/out/
+/upstream/
+/release/
+*.tar
+*.tar.gz
+*.tar.xz
+*.log
+__pycache__/

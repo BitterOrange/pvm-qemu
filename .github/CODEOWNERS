@@ -1,0 +1,4 @@
+# Workflows and release keys need the maintainer's review.
+/.github/ @BitterOrange
+/keys/ @BitterOrange
+/releases/ @BitterOrange

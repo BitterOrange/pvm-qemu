@@ -1,0 +1,198 @@
+# Builds every host for one release file. Called by ci.yml (no publishing)
+# and release.yml (publishes); never runs on its own.
+name: build
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: release tag, e.g. 11.1.3-pvm1; releases/<tag>.env must exist
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  TAG: ${{ inputs.tag }}
+  # Pinned images. Update the digest together with the tag comment.
+  UBUNTU_IMAGE: ubuntu:24.04@sha256:562111b88caa79c71391c0c4d3c2114a7d5c35915c20561fd893cb1e07929e6b
+  DEBIAN_IMAGE: debian:12@sha256:1d04200c2ece1d4d75a2a6f8e11ebce7d86a2ae28b34bb2c9cbb3ee9f4953e75
+  FEDORA_IMAGE: fedora:45@sha256:a7d72ba2745b100a3351087472e5ee7b2450af7cf331e7673007e3817612839c
+
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Check the release file
+        run: |
+          . script/lib.sh
+          load_release "$TAG"
+          echo "QEMU $QEMU_VERSION, patches: ${PATCHES:-none}"
+      - name: Download and verify the upstream tarball
+        run: script/verify-upstream.sh "$TAG" upstream
+      - name: Tamper tests
+        run: script/test-verify.sh "$TAG" upstream
+      - name: Source asset
+        run: script/make-source.sh "$TAG" upstream release
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: upstream
+          path: upstream/
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: release-source
+          path: release/
+          if-no-files-found: error
+
+  linux-amd64:
+    needs: source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: upstream
+          path: upstream
+      - name: Build in ${{ env.UBUNTU_IMAGE }}
+        run: |
+          mkdir out
+          docker run --rm -v "$PWD:/w" -w /w \
+            -e CONTAINER_DIGEST="${UBUNTU_IMAGE#*@}" -e GITHUB_RUN_ID -e GITHUB_SHA \
+            "$UBUNTU_IMAGE" \
+            bash -c 'script/ci/linux-build.sh "$0" upstream out; s=$?; chown -R '"$(id -u):$(id -g)"' out; exit $s' "$TAG"
+      - name: Isolated probe on the host
+        run: sudo script/probe-linux.sh out/tree/x86_64 /opt/pvm-qemu
+      - name: Smoke test on the host
+        run: python3 script/smoke.py out/tree/x86_64
+      - name: Start in other distributions
+        run: |
+          for image in "$DEBIAN_IMAGE" "$FEDORA_IMAGE"; do
+            docker run --rm -v "$PWD/out/tree/x86_64:/opt/t:ro" -v "$PWD/script:/opt/s:ro" "$image" sh /opt/s/smoke-start.sh /opt/t
+          done
+      - name: Archives
+        run: |
+          . script/lib.sh
+          SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          export SOURCE_DATE_EPOCH
+          mkdir release
+          python3 script/mktar.py --root out/tree --entry x86_64 --gzip --out "release/$(host_asset "$TAG" linux-amd64)"
+          python3 script/mktar.py --root out/deps --entry "$(basename "$(deps_asset "$TAG" linux-amd64)" .tar)" --out "release/$(deps_asset "$TAG" linux-amd64)"
+          ls -l release
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: release-linux-amd64
+          path: release/
+          if-no-files-found: error
+
+  darwin-arm64:
+    needs: source
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: upstream
+          path: upstream
+      - name: Build, pack and sign
+        run: mkdir out && script/ci/darwin-build.sh "$TAG" upstream out
+      - name: An unsigned copy must fail the closure check
+        run: |
+          cp -R out/tree/aarch64 "$RUNNER_TEMP/unsigned"
+          codesign --remove-signature "$RUNNER_TEMP/unsigned/bin/qemu-system-aarch64"
+          if script/check-closure.sh darwin-arm64 "$RUNNER_TEMP/unsigned"; then
+            echo "an unsigned emulator passed the check" >&2; exit 1
+          fi
+      - name: Smoke test from another path
+        run: |
+          cp -R out/tree/aarch64 "$RUNNER_TEMP/aarch64"
+          env -u DYLD_LIBRARY_PATH -u DYLD_FALLBACK_LIBRARY_PATH python3 script/smoke.py "$RUNNER_TEMP/aarch64"
+      - name: Archives
+        run: |
+          . script/lib.sh
+          SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          export SOURCE_DATE_EPOCH
+          mkdir release
+          python3 script/mktar.py --root out/tree --entry aarch64 --gzip --out "release/$(host_asset "$TAG" darwin-arm64)"
+          python3 script/mktar.py --root out/deps --entry "$(basename "$(deps_asset "$TAG" darwin-arm64)" .tar)" --out "release/$(deps_asset "$TAG" darwin-arm64)"
+          ls -l release
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: release-darwin-arm64
+          path: release/
+          if-no-files-found: error
+
+  windows-cross:
+    needs: source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: upstream
+          path: upstream
+      - name: Build the cross container from the QEMU tarball
+        run: |
+          . script/lib.sh && load_release "$TAG"
+          script/verify-upstream.sh --offline "$TAG" upstream
+          mkdir -p "$RUNNER_TEMP/docker"
+          tar -xJf "upstream/qemu-$QEMU_VERSION.tar.xz" -C "$RUNNER_TEMP/docker" "qemu-$QEMU_VERSION/tests/docker/dockerfiles/fedora-win64-cross.docker"
+          dir="$RUNNER_TEMP/docker/qemu-$QEMU_VERSION/tests/docker/dockerfiles"
+          docker build -t pvmq-win64-cross -f "$dir/fedora-win64-cross.docker" "$dir"
+          echo "CONTAINER_IMAGE=fedora-win64-cross.docker@$(docker image inspect --format '{{.Id}}' pvmq-win64-cross)" >> "$GITHUB_ENV"
+      - name: Cross-build
+        run: |
+          mkdir out
+          docker run --rm -v "$PWD:/w" -w /w -e CONTAINER_IMAGE -e GITHUB_RUN_ID -e GITHUB_SHA pvmq-win64-cross \
+            bash -c 'script/ci/windows-build.sh "$0" upstream out; s=$?; chown -R '"$(id -u):$(id -g)"' out; exit $s' "$TAG"
+      - name: Archives
+        run: |
+          . script/lib.sh
+          SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          export SOURCE_DATE_EPOCH
+          mkdir release
+          python3 script/mktar.py --root out/tree --entry x86_64 --gzip --out "release/$(host_asset "$TAG" windows-amd64)"
+          python3 script/mktar.py --root out/deps --entry "$(basename "$(deps_asset "$TAG" windows-amd64)" .tar)" --out "release/$(deps_asset "$TAG" windows-amd64)"
+          ls -l release
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: release-windows-amd64
+          path: release/
+          if-no-files-found: error
+
+  windows-smoke:
+    needs: windows-cross
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: release-windows-amd64
+          path: release
+      - name: Extract and run the smoke test
+        shell: pwsh
+        run: |
+          $archive = Get-ChildItem release -Filter "pvm-qemu-*-windows-amd64.tar.gz" | Select-Object -First 1
+          $dest = Join-Path $env:RUNNER_TEMP "smoke"
+          New-Item -ItemType Directory -Force $dest | Out-Null
+          python -c "import sys, tarfile; tarfile.open(sys.argv[1]).extractall(sys.argv[2], filter='data')" $archive.FullName $dest
+          python script/smoke.py (Join-Path $dest "x86_64")
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
