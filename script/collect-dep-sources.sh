@@ -69,21 +69,80 @@ while IFS=$'\t' read -r file real orig; do
       pkg=${BASH_REMATCH[1]} ver=${BASH_REMATCH[2]}
       lic="licenses/$pkg/"
       if [ -z "${done_pkg[$pkg]:-}" ]; then
-        info=$(brew info --json=v2 "$pkg")
-        stable=$(echo "$info" | python3 -c 'import json,sys; f=json.load(sys.stdin)["formulae"][0]; print(f["versions"]["stable"] + ("_" + str(f["revision"]) if f.get("revision") else ""))')
-        [ "$stable" = "$ver" ] || die "$pkg: installed $ver but the formula now builds $stable; the source would not match"
         mkdir -p "$out/$pkg" "$tree/doc/licenses/$pkg"
-        brew cat "$pkg" > "$out/$pkg/$pkg.rb"
-        echo "$info" | python3 -c 'import json,sys; print(json.load(sys.stdin)["formulae"][0].get("license") or "")' > "$out/$pkg/LICENSE-SPDX"
-        # The formula (with any inline patches), its source, and whatever
-        # else brew reports downloading for it, such as external patches.
-        fetched=$(HOMEBREW_NO_AUTO_UPDATE=1 brew fetch --build-from-source --retry "$pkg" 2>&1) || { echo "$fetched" >&2; die "cannot fetch the source of $pkg"; }
-        main=$(brew --cache --build-from-source "$pkg")
-        [ -f "$main" ] || { echo "$fetched" >&2; die "the source of $pkg is not at $main after brew fetch"; }
-        cp "$main" "$out/$pkg/"
-        while IFS= read -r path; do
-          [ -f "$path" ] && [ "$path" != "$main" ] && cp "$path" "$out/$pkg/"
-        done < <(echo "$fetched" | sed -nE 's/^(Downloaded to|Already downloaded): (.*)$/\2/p')
+        # Homebrew installs from its JSON API, with no local homebrew-core
+        # checkout, so take everything from the API's own record: the
+        # formula file at the commit the API was built from and the source
+        # tarball, each checked against the digest Homebrew publishes.
+        brew info --json=v2 "$pkg" > "$out/$pkg/info.json"
+        python3 - "$out/$pkg" "$pkg" "$ver" <<'PY' || die "cannot collect the source of $pkg"
+import hashlib, json, os, re, sys, time, urllib.request
+out, pkg, ver = sys.argv[1:4]
+f = json.load(open(os.path.join(out, "info.json")))["formulae"][0]
+
+def get(url):
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "pvm-qemu-ci"})
+            return urllib.request.urlopen(req, timeout=120).read()
+        except OSError as e:
+            if attempt == 2:
+                sys.exit(f"{url}: {e}")
+            time.sleep(5 * (attempt + 1))
+
+def fetch(url, sha256, dest):
+    data = get(url)
+    got = hashlib.sha256(data).hexdigest()
+    if got != sha256:
+        sys.exit(f"{url}: sha256 {got}, Homebrew publishes {sha256}")
+    open(os.path.join(out, dest), "wb").write(data)
+
+stable = f["versions"]["stable"] + (f"_{f['revision']}" if f.get("revision") else "")
+if stable != ver:
+    sys.exit(f"{pkg}: installed {ver}, but the formula now builds {stable}; the source would not match")
+core = f"https://raw.githubusercontent.com/Homebrew/homebrew-core/{f['tap_git_head']}"
+rb = f["ruby_source_path"]
+fetch(f"{core}/{rb}", f["ruby_source_checksum"]["sha256"], os.path.basename(rb))
+lines = open(os.path.join(out, os.path.basename(rb)), encoding="utf-8").read().splitlines()
+
+# Inline patches (patch :DATA) are in the formula file itself. Resource and
+# patch blocks name more sources: a url with its sha256, or a file in
+# homebrew-core, fetched at the same commit as the formula. Anything else
+# fails, so nothing the build used is left out.
+start = re.compile(r'^(\s*)(resource\s+"([^"]+)"|patch(\s+:p\d+)?)\s+do\s*$')
+i = 0
+while i < len(lines):
+    m = start.match(lines[i])
+    if not m:
+        i += 1
+        continue
+    indent, what = m.group(1), m.group(2)
+    body = []
+    i += 1
+    while i < len(lines) and lines[i] != indent + "end":
+        body.append(lines[i])
+        i += 1
+    text = "\n".join(body)
+    url = re.search(r'^\s*url\s+"([^"]+)"', text, re.M)
+    sha = re.search(r'^\s*sha256\s+"([0-9a-f]{64})"', text, re.M)
+    local = re.search(r'^\s*file\s+"([^"]+)"', text, re.M)
+    if url and sha:
+        name = os.path.basename(url.group(1).split("?")[0])
+        if what.startswith("patch"):
+            name = "patch-" + name
+        fetch(url.group(1), sha.group(1), name)
+    elif local and what.startswith("patch"):
+        data = get(f"{core}/{local.group(1)}")
+        open(os.path.join(out, "patch-" + os.path.basename(local.group(1))), "wb").write(data)
+    else:
+        sys.exit(f"{pkg}: cannot collect the source of the formula's {what} block")
+src = f["urls"]["stable"]
+if src.get("using") or not src.get("checksum"):
+    sys.exit(f"{pkg}: the formula's source is not a checksummed download")
+fetch(src["url"], src["checksum"], os.path.basename(src["url"].split("?")[0]))
+lic = f.get("license") or ""
+open(os.path.join(out, "LICENSE-SPDX"), "w").write((lic if isinstance(lic, str) else json.dumps(lic)) + "\n")
+PY
         found=0
         for f in /opt/homebrew/Cellar/"$pkg"/"$ver"/{COPYING*,LICENSE*,LICENCE*,COPYRIGHT*,NOTICE*}; do
           [ -f "$f" ] || continue
