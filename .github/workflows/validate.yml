@@ -1,0 +1,98 @@
+# Runs script/validate.sh on GitHub-hosted runners: a CI build of this
+# repository under an unchanged pvm release, through a whole VM cycle.
+# Manual only. Linux runs under KVM, so it stands in for a real KVM host.
+# macOS runners cannot nest virtualization, so the macOS job runs the same
+# cycle under TCG: it shows the build works inside pvm (relocated dylibs,
+# signatures, 9p, snapshots), but not that HVF starts it, which still needs
+# a real Mac. Nothing is published.
+name: validate
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: ci run whose archives to test (default the newest successful ci run on main)
+        type: string
+        required: false
+      pvm_tag:
+        description: pvm release to run them under
+        type: string
+        default: v1.3.6
+      macos:
+        description: also run the slow macOS job under TCG
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
+  PVM_TAG: ${{ inputs.pvm_tag }}
+  INPUT_RUN_ID: ${{ inputs.run_id }}
+
+jobs:
+  linux-kvm:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Open /dev/kvm to the runner user
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm-runner.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+      - name: Fetch the archive
+        run: script/ci/validate-fetch.sh linux-amd64 "$RUNNER_TEMP/archive"
+      - name: Install pvm ${{ inputs.pvm_tag }}
+        run: script/ci/validate-pvm.sh
+      - name: Put the build into pvm's runtime
+        run: script/validate.sh install "$RUNNER_TEMP"/archive/pvm-qemu-*-linux-amd64.tar.gz --no-attest
+      - name: VM cycle under KVM
+        run: |
+          mkdir -p "$RUNNER_TEMP/logs" && cd "$RUNNER_TEMP/logs"
+          "$GITHUB_WORKSPACE/script/validate.sh" run --mem 4096 --cpus 2
+      - name: Daemon log
+        if: always()
+        run: tail -200 "$HOME/.pvm/run/daemon.log" || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: validate-linux-kvm
+          path: ${{ runner.temp }}/logs/
+          if-no-files-found: ignore
+
+  macos-tcg:
+    if: inputs.macos
+    runs-on: macos-15
+    timeout-minutes: 300
+    env:
+      PVM_QEMU_ACCEL: tcg
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Fetch the archive
+        run: script/ci/validate-fetch.sh darwin-arm64 "$RUNNER_TEMP/archive"
+      - name: Install pvm ${{ inputs.pvm_tag }}
+        run: script/ci/validate-pvm.sh
+      - name: Put the build into pvm's runtime
+        run: script/validate.sh install "$RUNNER_TEMP"/archive/pvm-qemu-*-darwin-arm64.tar.gz --no-attest
+      - name: VM cycle under TCG
+        run: |
+          mkdir -p "$RUNNER_TEMP/logs" && cd "$RUNNER_TEMP/logs"
+          "$GITHUB_WORKSPACE/script/validate.sh" run --mem 4096 --cpus 3 --allow-tcg
+      - name: Daemon log
+        if: always()
+        run: tail -200 "$HOME/.pvm/run/daemon.log" || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: validate-macos-tcg
+          path: ${{ runner.temp }}/logs/
+          if-no-files-found: ignore

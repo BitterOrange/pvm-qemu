@@ -104,6 +104,13 @@ script/validate.sh restore
 
 It writes a log to attach to the release discussion. `restore` puts the original runtime back.
 
+The `validate` workflow, started by hand from the Actions tab, runs the same cycle on GitHub's runners, with the archives of a `ci` run under a pvm release (v1.3.6 by default):
+
+- **Linux** runs under KVM, which GitHub's Linux runners provide, so it stands in for a real KVM host.
+- **macOS** runs under TCG (`--allow-tcg`), because macOS runners cannot nest virtualization. It shows that the build works inside pvm, with its relocated libraries, its signatures, 9p and snapshots, but not that HVF starts it. That still needs a real Mac.
+
+Neither job can test an exit route, since there is no VPS to route through.
+
 ## Making a release
 
 1. Add `releases/<tag>.env` (and `patches/<tag>/` if any) in a pull request. CI builds every host from it and keeps the archives as workflow artifacts.

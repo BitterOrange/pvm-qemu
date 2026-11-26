@@ -8,12 +8,16 @@
 #       <arch>.pre-pvm-qemu, never deleted. Refuses while any QEMU runs from
 #       the slot. The archive's attestation is checked with gh unless
 #       --no-attest (for a CI artifact that is not a release yet).
-#   validate.sh run [--vm NAME] [--image IMAGE] [--exit EXIT] [--keep]
+#   validate.sh run [--vm NAME] [--image IMAGE] [--mem MB] [--cpus N]
+#                   [--exit EXIT] [--keep] [--allow-tcg]
 #       Runs the cycle on a new VM (default pvmqemu-check, ubuntu:26.04):
 #       create with bake, start and readiness, ssh, the /share and pvm mount
 #       9p paths (macOS, Linux), a port map, an exit route with a tunnel-loss
 #       check (with --exit, interactive), a RAM snapshot and its restore,
 #       compact, and removal (unless --keep). Logs to validate-<host>-<time>.log.
+#       --mem and --cpus size the VM (pvm's defaults otherwise). --allow-tcg
+#       skips the hardware accelerator check, for machines without one, such
+#       as GitHub's macOS runners.
 #   validate.sh restore
 #       Puts the original slot back. The pvm-qemu tree is kept as
 #       <arch>.pvm-qemu-<tag>-<time>.
@@ -119,13 +123,16 @@ cmd_status() {
 }
 
 cmd_run() {
-  local vm=pvmqemu-check image=ubuntu:26.04 exit_name="" keep=0
+  local vm=pvmqemu-check image=ubuntu:26.04 exit_name="" keep=0 allow_tcg=0
+  local size=()
   while [ $# -gt 0 ]; do
     case "$1" in
       --vm) vm=$2; shift 2 ;;
       --image) image=$2; shift 2 ;;
       --exit) exit_name=$2; shift 2 ;;
       --keep) keep=1; shift ;;
+      --mem|--cpus) size+=("$1" "$2"); shift 2 ;;
+      --allow-tcg) allow_tcg=1; shift ;;
       *) die "unknown option $1" ;;
     esac
   done
@@ -154,8 +161,12 @@ cmd_run() {
   egress_back() { in_vm 'curl -fsS -m 30 -o /dev/null --retry 5 --retry-all-errors https://example.com/'; }
   ram_kept() { in_vm 'cat /dev/shm/pvmq-mark' | grep -qx "$1"; }
 
-  step "create $vm (bakes the golden image if needed)" pvm create --image "$image" --name "$vm" --user dev || { echo "cannot continue"; exit 1; }
-  step "daemon reports a hardware accelerator, not tcg" hw_accel || true
+  step "create $vm (bakes the golden image if needed)" pvm create --image "$image" --name "$vm" --user dev "${size[@]}" || { echo "cannot continue"; exit 1; }
+  if [ "$allow_tcg" = 1 ]; then
+    echo "accelerator not checked (--allow-tcg): $(pvm daemon status | grep -i accel)"
+  else
+    step "daemon reports a hardware accelerator, not tcg" hw_accel || true
+  fi
   step "ssh runs a command" in_vm 'uname -a && nproc && free -m | head -2' || true
   step "QEMU runs from the slot" from_slot || true
   if [ "$host" != windows-amd64 ]; then
@@ -210,5 +221,5 @@ case "${1:-}" in
   run) shift; cmd_run "$@" ;;
   restore) shift; cmd_restore ;;
   status) shift; cmd_status ;;
-  *) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,/^set -euo/p' "$0" | sed '$d; s/^# \{0,1\}//'; exit 2 ;;
 esac
