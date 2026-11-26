@@ -23,6 +23,9 @@ command -v patchelf >/dev/null 2>&1 || die "patchelf is required"
 mkdir -p "$dest/bin" "$dest/lib" "$dest/share/qemu"
 cp "$system" "$dest/bin/qemu-system-x86_64.real"
 cp "$img" "$dest/bin/qemu-img.real"
+# The build keeps DWARF debug info; the distribution's libraries are
+# already stripped and are shipped as packaged.
+strip --strip-debug "$dest/bin/qemu-system-x86_64.real" "$dest/bin/qemu-img.real"
 "$PVMQ_ROOT/script/copy-firmware.sh" x86_64 "$prefix/share/qemu" "$dest/share/qemu"
 
 origins="$dest.origins"

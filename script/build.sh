@@ -78,7 +78,7 @@ printf '%s\n' "${args[@]}" | sed "s|^--prefix=.*|--prefix=<prefix>|" > "$prefix.
 # so fail if configure or the build adds anything under subprojects/.
 # (--disable-download would also stop QEMU's build venv from installing the
 # Python build tools it lacks, which Homebrew cannot supply.)
-subprojects() { find "$src/subprojects" -mindepth 1 -maxdepth 2 | LC_ALL=C sort; }
+subprojects() { find "$src/subprojects" -mindepth 1 -maxdepth 2 ! -name .wraplock | LC_ALL=C sort; }
 before=$(subprojects)
 
 build="$src/build-pvm"

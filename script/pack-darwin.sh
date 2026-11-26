@@ -22,6 +22,8 @@ dest=${2:?}
 mkdir -p "$dest/bin" "$dest/lib" "$dest/share/qemu"
 cp "$prefix/bin/qemu-system-aarch64" "$prefix/bin/qemu-img" "$dest/bin/"
 chmod 0755 "$dest/bin/"*
+# Drop debug symbols before the paths are rewritten and everything is signed.
+strip -S "$dest/bin/qemu-system-aarch64" "$dest/bin/qemu-img"
 "$PVMQ_ROOT/script/copy-firmware.sh" aarch64 "$prefix/share/qemu" "$dest/share/qemu"
 
 # Copy the closure of non-system dylibs. QEMU itself links no dylib of its

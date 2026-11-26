@@ -33,6 +33,9 @@ done
 
 mkdir -p "$dest/bin"
 cp "$bindir/qemu-system-x86_64.exe" "$bindir/qemu-img.exe" "$dest/bin/"
+# The build keeps DWARF debug info (about two thirds of the emulator).
+strip=$(command -v x86_64-w64-mingw32-strip) || die "x86_64-w64-mingw32-strip is required"
+"$strip" --strip-debug "$dest/bin/qemu-system-x86_64.exe" "$dest/bin/qemu-img.exe"
 "$PVMQ_ROOT/script/copy-firmware.sh" x86_64 "$datadir" "$dest/bin/share"
 
 system_dll() { grep -qixF "$1" <(grep -v '^#' "$PVMQ_ROOT/script/windows-system-dlls.txt") || [[ "${1,,}" == api-ms-win-* ]]; }
